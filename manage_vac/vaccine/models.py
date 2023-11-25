@@ -29,10 +29,10 @@ class Nurse(models.Model):
 
 class Vaccine(models.Model):
     name = models.CharField(max_length=255)
-    number_doses_free = models.IntegerField()
-    on_hold = models.IntegerField()
+    number_doses_free = models.IntegerField(null=False, blank=False, default=0) #Use it to store what vaccine dose it is.
+    on_hold = models.IntegerField(null=False, blank=False, default = 0)
     description = models.TextField(blank=True, null=True)
-    total_availability = models.IntegerField()
+    total_availability = models.IntegerField(null=False, blank=False, default=100)
 
 class Timeslot(models.Model):
     timestamp = models.DateTimeField()      # do we need slots for that hour.. how to get hour?
