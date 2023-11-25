@@ -49,6 +49,139 @@ def login_view(request):
         return JsonResponse({'message': 'This endpoint only accepts POST requests'})
 
 
+# views.py
+
+# from rest_framework.generics import ListAPIView
+# from rest_framework.response import Response
+# from rest_framework import status
+# from .models import Nurse
+# from .serializers import NurseSerializer
+
+# @csrf_exempt
+# class NurseListView(ListAPIView):
+#     queryset = Nurse.objects.all()
+#     serializer_class = NurseSerializer
+#     # def get(self, request, *args, **kwargs):
+#     #     nurses = Nurse.objects.all()
+#     #     serializer = NurseSerializer(nurses, many=True)
+#     #     return Response(serializer.data, status=status.HTTP_200_OK)
+
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from .models import Nurse
+from .serializers import NurseSerializer
+
+# @csrf_exempt
+# def nurse_list(request):
+#     #print("Got request")
+#     if request.method == 'GET':
+#         nurses = Nurse.objects.all()
+#         serializer = NurseSerializer(nurses, many=True)
+#         #print('Data before sending:', serializer.data)
+
+#         return JsonResponse(serializer.data, safe=False)
+#     else:
+#         return JsonResponse({'message': 'Method not allowed'}, status=405)
+
+from .serializers import CustomNurseSerializer, CustomPatientSerializer
+@csrf_exempt
+def nurse_list(request):
+    if request.method == 'GET':
+        # Write your custom SQL query
+        query = "SELECT vaccine_nurse.id as id, vaccine_nurse.emp_id as emp_id, vaccine_user.name as name, vaccine_user.phone_number as phone_number,vaccine_user.address as address, vaccine_user.gender as gender FROM vaccine_nurse join vaccine_user ON vaccine_nurse.user_id = vaccine_user.id "
+        
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            columns = [col[0] for col in cursor.description]
+            nurses_data = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        
+        serializer = CustomNurseSerializer(data =nurses_data, many=True)
+        print('Data before sending:', serializer.initial_data)
+        
+        #return JsonResponse(serializer.data, safe=False)
+        if serializer.is_valid():
+            return JsonResponse(serializer.data, safe=False)
+        else:
+            return JsonResponse({'message': 'Serializer error'}, status=800)
+    else:
+        return JsonResponse({'message': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+def patient_list(request):
+    if request.method == 'GET':
+        query = '''
+            SELECT vaccine_patient.id as id, vaccine_user.name as name, vaccine_user.age as age, vaccine_user.gender as gender,
+            vaccine_patient.race as race, vaccine_patient.no_doses_received as prev_doses,
+            vaccine_timeslot.timestamp as next_appointment
+            FROM vaccine_patient JOIN vaccine_user ON vaccine_user.id = vaccine_patient.user_id 
+            JOIN vaccine_appointment ON vaccine_appointment.patient_id = vaccine_patient.id
+            JOIN vaccine_timeslot ON vaccine_appointment.timeslot_id = vaccine_timeslot.id
+        '''
+        
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            columns = [col[0] for col in cursor.description]
+            patients_data = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        serializer = CustomPatientSerializer(data=patients_data, many=True)
+        
+        if serializer.is_valid():
+            return JsonResponse(serializer.data, safe=False)
+        else:
+            return JsonResponse({'message': 'Serializer error'}, status=500)
+    else:
+        return JsonResponse({'message': 'Method not allowed'}, status=405)
+
+
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from .models import User, Nurse
+
+@csrf_exempt
+def register_nurse(request):
+    if request.method == 'POST':
+        # Get form data
+        name = request.POST.get('name')
+        employee_id = request.POST.get('employee_id')
+        age = request.POST.get('age')
+        phone_number = request.POST.get('phone_number')
+        gender = request.POST.get('gender')
+        address = request.POST.get('address')
+
+        print([name, employee_id, age])
+
+        # Check if user with the given employee_id already exists
+        if Nurse.objects.filter(emp_id=employee_id).exists():
+            return JsonResponse({'message': 'Cannot Register. User already exists'}, status=400)
+
+        # Create a new user in the vaccine_user table
+        user = User.objects.create(
+            name=name,
+            password="test",
+            phone_number=phone_number,
+            ssn="None",
+            address=address,
+            age=age,
+            gender=gender,
+            user_type="nurse",
+            user_name=employee_id
+        )
+
+        # Create a new nurse in the vaccine_nurse table
+        Nurse.objects.create(
+            user=user,
+            emp_id=employee_id
+        )
+
+        return JsonResponse({'message': 'Nurse registered successfully'}, status=201)
+
+    else:
+        return JsonResponse({'message': 'Method not allowed'}, status=405)
+
+
 
 
 
