@@ -48,8 +48,97 @@ def login_view(request):
     else:
         return JsonResponse({'message': 'This endpoint only accepts POST requests'})
 
+#Assuming username and password are not being updated. So, name, ssn, age, gender would be the updated details. 
+#Information needed: nurse_id, user_id, 
+# def update_nurse_admin(request):
+#     pass
+
+#Nurse ID
+#User ID
+def delete_nurse(request):
+    if request.POST:
+        user_row = -1
+        # user_type = User.objects.get(id = request.POST['user_id'])
+        # user_type = user_type.user_type
+        if user_type[0]=="Admin":
+            query2 = """
+            DELETE FROM nurse WHERE id = %s
+            """
+            cursor = connection.cursor()
+            cursor.execute(query2, [request.POST['nurse_id'],])
+            user_row = cursor.rowcount
+
+        if user_row>0:
+            return JsonResponse({'message': 'Nurse Details deleted successfully.', 'user_type': user_type})
+        elif user_row==0:
+            return JsonResponse({'message': 'No record found.', status=401})
+        else:
+            return JsonResponse({'message': 'User doesn\'t have access.', status=401})
+    else:
+        return JsonResponse({'message': 'This endpoint only accepts POST requests'})
+            
+#Assumption: Each dose of a vaccine is considered a different vaccine altogether. So, we can have names as Pfizer - Dose 1, Pfizer - Dose 2
+#So, name of vaccine: Pfizer, number_of_dose: 1/2, this way, easier to filter.
+#Assuming that no vaccines are initially on hold.
+#Information needed: name, dose_number, description, total_count, user_id
+def add_vaccine(request):
+    if request.POST:
+        query1 = """
+        SELECT user_type FROM vaccine_user WHERE id = %s
+        """
+        cursor = connection.cursor()
+        cursor.execute(query1, [request.POST['user_id'],])
+        user_type = cursor.fetchone()
+        user_row = -1
+        # user_type = User.objects.get(id = request.POST['user_id'])
+        # user_type = user_type.user_type
+        if user_type[0]=="Admin":
+            query2 = """
+            INSERT INTO vaccine VALUES(%s, %s, %s, %s, %s)
+            """
+            cursor = connection.cursor()
+            cursor.execute(query2, [request.POST['name'], request.POST['dose_number'], 0, request.POST['description'], request.POST['total_count']])
+            user_row = cursor.rowcount
+
+        if user_row>0:
+            return JsonResponse({'message': 'Vaccine Details added successfully.', 'user_type': user_type})
+        elif user_row==0:
+            return JsonResponse({'message': 'No record found.', status=401})
+        else:
+            return JsonResponse({'message': 'User doesn\'t have access.', status=401})
+    else:
+        return JsonResponse({'message': 'This endpoint only accepts POST requests'})
 
 
+#This method only updates the total availability count of the vaccine (provided it doesn't affect the on-hold vaccines),
+#since the project requirements documentation only mentions the same requirement under 'Update Vaccine'.
+#Information needed: vaccine_id, new_total_count, user_id
+def update_vaccine(request):
+    if request.POST:
+        query1 = """
+        SELECT user_type FROM vaccine_user WHERE id = %s
+        """
+        cursor = connection.cursor()
+        cursor.execute(query1, [request.POST['user_id'],])
+        user_type = cursor.fetchone()
+        user_row = -1
+        # user_type = User.objects.get(id = request.POST['user_id'])
+        # user_type = user_type.user_type
+        if user_type[0]=="Admin":
+            query2 = """
+            UPDATE vaccine SET total_availability=%s WHERE id=%s AND on_hold<%s
+            """
+            cursor = connection.cursor()
+            cursor.execute(query2, [request.POST['new_total_count'], request.POST['vaccine_id'],request.POST['new_total_count']])
+            user_row = cursor.rowcount
+        if user_row>0:
+            return JsonResponse({'message': 'Vaccine Details updated successfully.', 'user_type': user_type})
+        elif user_row==0:
+            return JsonResponse({'message': 'No record found.', status=401})
+        else:
+            return JsonResponse({'message': 'User doesn\'t have access.', status=401})
+    else:
+        return JsonResponse({'message': 'This endpoint only accepts POST requests'})
 
 
 # @api_view(['POST'])
