@@ -12,7 +12,7 @@ from django.contrib.auth import authenticate, login
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
-from .models import User  # Import your User model
+from .models import User, Nurse  # Import your User model
 
 
 @csrf_exempt
@@ -35,6 +35,8 @@ def login_view(request):
         cursor.execute(query, [username, password, user_type])
         user_row = cursor.fetchone()
         print(user_row)
+        user_id = user_row[-1]
+        name = user_row[1]
 
         # print(username, password, user_type)
 
@@ -42,7 +44,7 @@ def login_view(request):
         
         if user_row is not None:
             #login(request, user)
-            return JsonResponse({'message': 'Login successful', 'user_type': user_type})
+            return JsonResponse({'message': 'Login successful', 'user_type': user_type, 'user_id': user_id, 'name': name})
         else:
             return JsonResponse({'message': 'Incorrect password or user does not exist'}, status=401)
     else:
@@ -58,27 +60,26 @@ def login_view(request):
 
 # #Nurse ID
 # #User ID
-# def delete_nurse(request):
-#     if request.POST:
-#         user_row = -1
-#         # user_type = User.objects.get(id = request.POST['user_id'])
-#         # user_type = user_type.user_type
-#         if user_type[0]=="Admin":
-#             query2 = """
-#             DELETE FROM nurse WHERE id = %s
-#             """
-#             cursor = connection.cursor()
-#             cursor.execute(query2, [request.POST['nurse_id'],])
-#             user_row = cursor.rowcount
+@csrf_exempt
+def delete_nurse(request):
+    if request.method == "POST":
+        user_row = -1
+        query2 = """ DELETE FROM vaccine_nurse WHERE id = %s  """
+        nurse_id = request.POST.get('nurse_id')
+        print(nurse_id)
+        cursor = connection.cursor()
+        cursor.execute(query2, [nurse_id])
+        user_row = cursor.rowcount
+        print("Nurse Deleted")
 
-#         if user_row>0:
-#             return JsonResponse({'message': 'Nurse Details deleted successfully.', 'user_type': user_type})
-#         elif user_row==0:
-#             return JsonResponse({'message': 'No record found.', status=401})
-#         else:
-#             return JsonResponse({'message': 'User doesn\'t have access.', status=401})
-#     else:
-#         return JsonResponse({'message': 'This endpoint only accepts POST requests'})
+        if user_row>0:
+            return JsonResponse({'message': 'Nurse Details deleted successfully.'})
+        elif user_row==0:
+            return JsonResponse({'message': 'No record found.'}, status=401)
+        else:
+            return JsonResponse({'message': 'User doesn\'t have access.'}, status=401)
+    else:
+        return JsonResponse({'message': 'This endpoint only accepts POST requests'})
             
 # #Assumption: Each dose of a vaccine is considered a different vaccine altogether. So, we can have names as Pfizer - Dose 1, Pfizer - Dose 2
 # #So, name of vaccine: Pfizer, number_of_dose: 1/2, this way, easier to filter.
