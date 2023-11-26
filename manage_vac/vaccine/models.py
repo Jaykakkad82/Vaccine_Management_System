@@ -18,7 +18,7 @@ class User(models.Model):
 
 class Patient(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    no_doses_received = models.IntegerField()
+    no_doses_received = models.IntegerField(default=0)
     race = models.CharField(max_length=50)
     occupation = models.CharField(max_length=50)
     medical_history = models.TextField()
@@ -35,8 +35,8 @@ class Vaccine(models.Model):
     total_availability = models.IntegerField(null=False, blank=False, default=100)
 
 class Timeslot(models.Model):
-    timestamp = models.DateTimeField()      # do we need slots for that hour.. how to get hour?
-    open_slots = models.IntegerField()      # number of slots that hour
+    timestamp = models.DateTimeField(unique=True)      # do we need slots for that hour.. how to get hour?
+    open_slots = models.IntegerField(default=0)      # number of slots that hour
 
 class Appointment(models.Model):
     vaccine_dose = models.IntegerField()
