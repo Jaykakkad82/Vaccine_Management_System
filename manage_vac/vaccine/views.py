@@ -48,66 +48,104 @@ def login_view(request):
     else:
         return JsonResponse({'message': 'This endpoint only accepts POST requests'})
 
-#Assuming username and password are not being updated. So, name, ssn, age, gender would be the updated details. 
-#Information needed: nurse_id, user_id, 
-# def update_nurse_admin(request):
-#     pass
 
-#Nurse ID
-#User ID
-def delete_nurse(request):
-    if request.POST:
-        user_row = -1
-        # user_type = User.objects.get(id = request.POST['user_id'])
-        # user_type = user_type.user_type
-        if user_type[0]=="Admin":
-            query2 = """
-            DELETE FROM nurse WHERE id = %s
-            """
-            cursor = connection.cursor()
-            cursor.execute(query2, [request.POST['nurse_id'],])
-            user_row = cursor.rowcount
+# ======= COMMENTED OUT =====================#
 
-        if user_row>0:
-            return JsonResponse({'message': 'Nurse Details deleted successfully.', 'user_type': user_type})
-        elif user_row==0:
-            return JsonResponse({'message': 'No record found.', status=401})
-        else:
-            return JsonResponse({'message': 'User doesn\'t have access.', status=401})
-    else:
-        return JsonResponse({'message': 'This endpoint only accepts POST requests'})
+# #Assuming username and password are not being updated. So, name, ssn, age, gender would be the updated details. 
+# #Information needed: nurse_id, user_id, 
+# # def update_nurse_admin(request):
+# #     pass
+
+# #Nurse ID
+# #User ID
+# def delete_nurse(request):
+#     if request.POST:
+#         user_row = -1
+#         # user_type = User.objects.get(id = request.POST['user_id'])
+#         # user_type = user_type.user_type
+#         if user_type[0]=="Admin":
+#             query2 = """
+#             DELETE FROM nurse WHERE id = %s
+#             """
+#             cursor = connection.cursor()
+#             cursor.execute(query2, [request.POST['nurse_id'],])
+#             user_row = cursor.rowcount
+
+#         if user_row>0:
+#             return JsonResponse({'message': 'Nurse Details deleted successfully.', 'user_type': user_type})
+#         elif user_row==0:
+#             return JsonResponse({'message': 'No record found.', status=401})
+#         else:
+#             return JsonResponse({'message': 'User doesn\'t have access.', status=401})
+#     else:
+#         return JsonResponse({'message': 'This endpoint only accepts POST requests'})
             
-#Assumption: Each dose of a vaccine is considered a different vaccine altogether. So, we can have names as Pfizer - Dose 1, Pfizer - Dose 2
-#So, name of vaccine: Pfizer, number_of_dose: 1/2, this way, easier to filter.
-#Assuming that no vaccines are initially on hold.
-#Information needed: name, dose_number, description, total_count, user_id
-def add_vaccine(request):
-    if request.POST:
-        query1 = """
-        SELECT user_type FROM vaccine_user WHERE id = %s
-        """
-        cursor = connection.cursor()
-        cursor.execute(query1, [request.POST['user_id'],])
-        user_type = cursor.fetchone()
-        user_row = -1
-        # user_type = User.objects.get(id = request.POST['user_id'])
-        # user_type = user_type.user_type
-        if user_type[0]=="Admin":
-            query2 = """
-            INSERT INTO vaccine VALUES(%s, %s, %s, %s, %s)
-            """
-            cursor = connection.cursor()
-            cursor.execute(query2, [request.POST['name'], request.POST['dose_number'], 0, request.POST['description'], request.POST['total_count']])
-            user_row = cursor.rowcount
+# #Assumption: Each dose of a vaccine is considered a different vaccine altogether. So, we can have names as Pfizer - Dose 1, Pfizer - Dose 2
+# #So, name of vaccine: Pfizer, number_of_dose: 1/2, this way, easier to filter.
+# #Assuming that no vaccines are initially on hold.
+# #Information needed: name, dose_number, description, total_count, user_id
+# def add_vaccine(request):
+#     if request.POST:
+#         query1 = """
+#         SELECT user_type FROM vaccine_user WHERE id = %s
+#         """
+#         cursor = connection.cursor()
+#         cursor.execute(query1, [request.POST['user_id'],])
+#         user_type = cursor.fetchone()
+#         user_row = -1
+#         # user_type = User.objects.get(id = request.POST['user_id'])
+#         # user_type = user_type.user_type
+#         if user_type[0]=="Admin":
+#             query2 = """
+#             INSERT INTO vaccine VALUES(%s, %s, %s, %s, %s)
+#             """
+#             cursor = connection.cursor()
+#             cursor.execute(query2, [request.POST['name'], request.POST['dose_number'], 0, request.POST['description'], request.POST['total_count']])
+#             user_row = cursor.rowcount
 
-        if user_row>0:
-            return JsonResponse({'message': 'Vaccine Details added successfully.', 'user_type': user_type})
-        elif user_row==0:
-            return JsonResponse({'message': 'No record found.', status=401})
-        else:
-            return JsonResponse({'message': 'User doesn\'t have access.', status=401})
-    else:
-        return JsonResponse({'message': 'This endpoint only accepts POST requests'})
+#         if user_row>0:
+#             return JsonResponse({'message': 'Vaccine Details added successfully.', 'user_type': user_type})
+#         elif user_row==0:
+#             return JsonResponse({'message': 'No record found.', status=401})
+#         else:
+#             return JsonResponse({'message': 'User doesn\'t have access.', status=401})
+#     else:
+#         return JsonResponse({'message': 'This endpoint only accepts POST requests'})
+
+
+
+# #This method only updates the total availability count of the vaccine (provided it doesn't affect the on-hold vaccines),
+# #since the project requirements documentation only mentions the same requirement under 'Update Vaccine'.
+# #Information needed: vaccine_id, new_total_count, user_id
+# def update_vaccine(request):
+#     if request.POST:
+#         query1 = """
+#         SELECT user_type FROM vaccine_user WHERE id = %s
+#         """
+#         cursor = connection.cursor()
+#         cursor.execute(query1, [request.POST['user_id'],])
+#         user_type = cursor.fetchone()
+#         user_row = -1
+#         # user_type = User.objects.get(id = request.POST['user_id'])
+#         # user_type = user_type.user_type
+#         if user_type[0]=="Admin":
+#             query2 = """
+#             UPDATE vaccine SET total_availability=%s WHERE id=%s AND on_hold<%s
+#             """
+#             cursor = connection.cursor()
+#             cursor.execute(query2, [request.POST['new_total_count'], request.POST['vaccine_id'],request.POST['new_total_count']])
+#             user_row = cursor.rowcount
+#         if user_row>0:
+#             return JsonResponse({'message': 'Vaccine Details updated successfully.', 'user_type': user_type})
+#         elif user_row==0:
+#             return JsonResponse({'message': 'No record found.', status=401})
+#         else:
+#             return JsonResponse({'message': 'User doesn\'t have access.', status=401})
+#     else:
+#         return JsonResponse({'message': 'This endpoint only accepts POST requests'})
+
+
+# ======================================== TILL THIS POINT =================================================================
 
 # views.py
 
@@ -242,36 +280,51 @@ def register_nurse(request):
         return JsonResponse({'message': 'Method not allowed'}, status=405)
 
 
+from django.http import JsonResponse
+from django.db import connection
+import json
 
-#This method only updates the total availability count of the vaccine (provided it doesn't affect the on-hold vaccines),
-#since the project requirements documentation only mentions the same requirement under 'Update Vaccine'.
-#Information needed: vaccine_id, new_total_count, user_id
-def update_vaccine(request):
-    if request.POST:
-        query1 = """
-        SELECT user_type FROM vaccine_user WHERE id = %s
-        """
-        cursor = connection.cursor()
-        cursor.execute(query1, [request.POST['user_id'],])
-        user_type = cursor.fetchone()
-        user_row = -1
-        # user_type = User.objects.get(id = request.POST['user_id'])
-        # user_type = user_type.user_type
-        if user_type[0]=="Admin":
-            query2 = """
-            UPDATE vaccine SET total_availability=%s WHERE id=%s AND on_hold<%s
-            """
-            cursor = connection.cursor()
-            cursor.execute(query2, [request.POST['new_total_count'], request.POST['vaccine_id'],request.POST['new_total_count']])
-            user_row = cursor.rowcount
-        if user_row>0:
-            return JsonResponse({'message': 'Vaccine Details updated successfully.', 'user_type': user_type})
-        elif user_row==0:
-            return JsonResponse({'message': 'No record found.', status=401})
-        else:
-            return JsonResponse({'message': 'User doesn\'t have access.', status=401})
+
+@csrf_exempt
+def admin_update_nurse_details(request, nurse_id):
+    if request.method == 'POST':
+        # Check if nurseId exists
+        query = f"SELECT * FROM vaccine_nurse JOIN vaccine_user ON vaccine_nurse.user_id = vaccine_user.id WHERE vaccine_nurse.id = {nurse_id}"
+
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            columns = [col[0] for col in cursor.description]
+            nurse_data = cursor.fetchone()
+        print("Nurse data: ", nurse_data)
+        if not nurse_data:
+            return JsonResponse({'message': 'Nurse ID does not exist'}, status=404)
+
+        # Return nurse data to frontend
+        response_data = dict(zip(columns, nurse_data))
+        return JsonResponse(response_data, safe=False)
+
+    elif request.method == 'PUT':
+        # Extract updated details from request body
+        updated_details = json.loads(request.body.decode('utf-8'))
+        
+        updated_details = updated_details["updatedDetails"]
+        print(updated_details)
+
+        # Update vaccine_user and vaccine_nurse tables
+        # Modify the update queries based on your model structure
+        # user_update_query = f"UPDATE vaccine_user SET name = '{updated_details['name']}', age = {updated_details['age']}, gender = '{updated_details['gender']}' WHERE id = {nurse_id}"
+        # nurse_update_query = f"UPDATE vaccine_nurse SET emp_id = '{updated_details['emp_id']}' WHERE id = {nurse_id}"
+        user_update_query = f"UPDATE vaccine_user SET name = '{updated_details['name']}', age = {updated_details['age']}, gender = '{updated_details['gender']}', user_name = '{updated_details['user_name']}', password = '{updated_details['password']}' WHERE id = (SELECT user_id FROM vaccine_nurse WHERE id = {nurse_id})"
+
+        with connection.cursor() as cursor:
+            cursor.execute(user_update_query)
+            #cursor.execute(nurse_update_query)
+
+        return JsonResponse({'message': 'Information updated'}, status=200)
+
     else:
-        return JsonResponse({'message': 'This endpoint only accepts POST requests'})
+        return JsonResponse({'message': 'Method not allowed'}, status=405)
+
 
 
 # @api_view(['POST'])

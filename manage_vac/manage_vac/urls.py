@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from vaccine.views import login_view
-from vaccine.views import nurse_list, patient_list, register_nurse
+from vaccine.views import nurse_list, patient_list, register_nurse, admin_update_nurse_details
 
 
 urlpatterns = [
@@ -26,4 +26,5 @@ urlpatterns = [
     path('api/admin_nurses/', nurse_list, name='nurse-list'),
     path('api/admin_patientinfo/', patient_list, name='patient_list'),
     path('api/admin_register_nurse/', register_nurse, name='register-nurse'),
+    path('api/admin-update-nurse-details/<int:nurse_id>/', admin_update_nurse_details, name='admin-nurseUpdate'),
 ]
