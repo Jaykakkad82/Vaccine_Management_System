@@ -35,7 +35,7 @@ def login_view(request):
         cursor.execute(query, [username, password, user_type])
         user_row = cursor.fetchone()
         print(user_row)
-        user_id = user_row[-1]
+        user_id = user_row[0]
         name = user_row[1]
 
         # print(username, password, user_type)
@@ -84,34 +84,37 @@ def delete_nurse(request):
 # #Assumption: Each dose of a vaccine is considered a different vaccine altogether. So, we can have names as Pfizer - Dose 1, Pfizer - Dose 2
 # #So, name of vaccine: Pfizer, number_of_dose: 1/2, this way, easier to filter.
 # #Assuming that no vaccines are initially on hold.
-# #Information needed: name, dose_number, description, total_count, user_id
-# def add_vaccine(request):
-#     if request.POST:
-#         query1 = """
-#         SELECT user_type FROM vaccine_user WHERE id = %s
-#         """
-#         cursor = connection.cursor()
-#         cursor.execute(query1, [request.POST['user_id'],])
-#         user_type = cursor.fetchone()
-#         user_row = -1
-#         # user_type = User.objects.get(id = request.POST['user_id'])
-#         # user_type = user_type.user_type
-#         if user_type[0]=="Admin":
-#             query2 = """
-#             INSERT INTO vaccine VALUES(%s, %s, %s, %s, %s)
-#             """
-#             cursor = connection.cursor()
-#             cursor.execute(query2, [request.POST['name'], request.POST['dose_number'], 0, request.POST['description'], request.POST['total_count']])
-#             user_row = cursor.rowcount
+# #Information needed: name, dose_number, description, count, user_id
+@csrf_exempt
+def add_vaccine(request):
+    if request.method == "POST":
+        query1 = """
+        SELECT user_type FROM vaccine_user WHERE id = %s
+        """
+        cursor = connection.cursor()
+        cursor.execute(query1, [request.POST['user_id']])
+        user_type = cursor.fetchone()
+        user_row = -1
+        # user_type = User.objects.get(id = request.POST['user_id'])
+        # user_type = user_type.user_type
+        print("user type is: ", user_type)
+        if user_type[0]=="Admin":
+            query2 = """
+            INSERT INTO vaccine_vaccine (name, number_doses_free, on_hold, description, total_availability)
+            VALUES(%s, %s, %s, %s, %s)
+            """
+            cursor = connection.cursor()
+            cursor.execute(query2, [request.POST['name'], request.POST['dose_number'], 0, request.POST['description'], request.POST['total_count']])
+            user_row = cursor.rowcount
 
-#         if user_row>0:
-#             return JsonResponse({'message': 'Vaccine Details added successfully.', 'user_type': user_type})
-#         elif user_row==0:
-#             return JsonResponse({'message': 'No record found.', status=401})
-#         else:
-#             return JsonResponse({'message': 'User doesn\'t have access.', status=401})
-#     else:
-#         return JsonResponse({'message': 'This endpoint only accepts POST requests'})
+            if user_row>0:
+                return JsonResponse({'message': 'Vaccine Details added successfully.', 'user_type': user_type})
+            elif user_row==0:
+                return JsonResponse({'message': 'could not add'}, status=401)
+        else:
+            return JsonResponse({'message': 'User doesn\'t have access.'}, status=401)
+    else:
+        return JsonResponse({'message': 'This endpoint only accepts POST requests'})
 
 
 
