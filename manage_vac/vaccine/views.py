@@ -6,14 +6,16 @@ from django.shortcuts import render
 # from rest_framework.decorators import api_view
 # from .models import Nurse, Vaccine
 # from .serializers import NurseSerializer, VaccineSerializer
-
-
+from django.utils import timezone
+from django.utils.timezone import timedelta
+from django.http.multipartparser import MultiPartParser
+from django.http import QueryDict
 from django.contrib.auth import authenticate, login
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
 from .models import User, Nurse, Patient, Vaccine, Timeslot, Appointment, Record, Assigned  # Import your User model
-
+from datetime import datetime
 
 @csrf_exempt
 def login_view(request):
@@ -515,5 +517,177 @@ def patient_update_info(request, user_id, user_type):
             cursor.execute(query, [name, pswd, phnum, ssn, addr, age, gen, uname, user_id])
             cursor.execute("""UPDATE vaccine_patient SET race=%s, occupation=%s, medical_history=%s WHERE user_id=%s""", [race, job, med_det, user_id])
             return JsonResponse({'message': 'Patient Details updated successfully.', 'user_type': user_type})
+    else:
+        return JsonResponse({'message': 'This endpoint only accepts PUT or POST requests'})
+
+#Information Needed (for POST): user_type, user_id
+#Information Needed (for PUT): user_type, user_id, vaccine_id (or name, no_dose of vaccine), timestamp
+@csrf_exempt
+def patient_schedule_appt(request, user_id, user_type):
+    if user_type not in ["Patient", "patient"]:
+        return JsonResponse({'message': 'User doesn\'t have access.'}, status=401)
+    if request.method=="PUT":
+        #print("Data: ", request.POST, user_id, user_type)
+        put_data = MultiPartParser(request.META, request, request.upload_handlers).parse()
+        put_data = dict(put_data[0])
+        #print("Try: ", put_data)
+        vaccine_id = int(put_data['vaccine_id'][0])
+        timestamp = put_data['timestamp'][0]
+        timestamp = timestamp.replace('T', ' ')
+        #print(vaccine_id, timestamp)
+        timestamp = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+        #print("Time: ", timestamp, type(timestamp))
+        query = """
+        INSERT INTO vaccine_appointment(vaccine_dose, vaccine_id, patient_id, timeslot_id) 
+        VALUES((SELECT number_doses_free FROM vaccine_vaccine WHERE id=%s), %s, %s, (SELECT id FROM vaccine_timeslot WHERE timestamp=%s))
+        """
+        patient_id = Patient.objects.get(user__id = user_id)
+        patient_id = patient_id.id
+        with connection.cursor() as cursor:
+            print("Yes.")
+            cursor.execute(query, [vaccine_id, vaccine_id, patient_id, timestamp])
+            print("Check 1")
+            apptid = cursor.lastrowid
+            print("ID: ", apptid)
+            cursor.execute("UPDATE vaccine_vaccine SET on_hold = on_hold+1 WHERE id=%s", [vaccine_id])
+            print("Check X.")
+            cursor.execute("UPDATE vaccine_timeslot SET open_slots = open_slots-1 WHERE timestamp=%s", [timestamp])
+            print("Updated.")
+            count = cursor.rowcount
+            print(count)
+            if count>0:
+                message = 'Appointment registered with ID: '+str(apptid)
+                return JsonResponse({'message': message, 'user_type': user_type, 'appt_id': apptid}, status=201)
+            else:
+                return JsonResponse({'message': 'Error in Registration.'}, status=401) 
+    elif request.method=="POST":
+        print("here")
+
+        patient_id = Patient.objects.get(user__id = user_id)
+        patient_id = patient_id.id
+        query = """
+        SELECT * FROM vaccine_patient WHERE id=%s
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, [patient_id])
+            patient = cursor.fetchone()
+            print("Patient details: ", patient_id, patient, patient[1])
+        if patient[1]==0:
+            query2 = """
+            SELECT id, name FROM vaccine_vaccine WHERE number_doses_free=1 AND total_availability-on_hold>0
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query2)
+                columns = [col[0] for col in cursor.description] #name, number_doses_free, on_hold, description, total_availability
+                #Change select * from query2 to individual column names if all columns not wanted.
+                vaccine_data = cursor.fetchall()
+                print("Vaccine data: ", vaccine_data)
+            if not vaccine_data:
+                return JsonResponse({'message': 'No Vaccines Available.'})
+            #vaccine_data = tuple(zip(columns, *vaccine_data))
+            timezone.activate('UTC')
+            appt_day = timezone.now().date() + timedelta(1)
+            timezone.deactivate()
+            query3 = """
+            SELECT timestamp FROM vaccine_timeslot WHERE open_slots>0 AND DATE(timestamp)=%s
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query3, [appt_day])                              # query 3
+                columns = [col[0] for col in cursor.description]
+                schedule_data = cursor.fetchall()
+                print("Schedule data 0: ", schedule_data)
+            if not schedule_data:
+                return JsonResponse({'message': 'No Appointments Available.'})
+            #schedule_data = tuple(zip(columns, *schedule_data))
+            print("Schedule data: ", schedule_data)
+            response_data = {"schedule_data": schedule_data, "vaccine_data": vaccine_data}  # changed schedule_data
+            return JsonResponse(response_data, safe=False)
+        elif patient[1]>0:
+            with connection.cursor() as cursor:
+                
+                temp_query = """
+                SELECT * FROM vaccine_patient WHERE id=%s AND 
+                no_doses_received<=(SELECT max(number_doses_free) FROM vaccine_vaccine WHERE 
+                name=(SELECT name FROM vaccine_vaccine WHERE id=(SELECT vaccine_id FROM vaccine_appointment 
+                WHERE patient_id=%s ORDER BY vaccine_dose DESC LIMIT 1)))
+                """
+                cursor.execute(temp_query, [patient_id, patient_id])
+                vcheck = cursor.fetchall()
+                if not vcheck:
+                    return JsonResponse({'message': 'You\'ve been completely vaccinated.'})
+            vc_id = Appointment.objects.filter(patient=patient_id).order_by('-vaccine_dose').values().first()
+            vc_id = vc_id['vaccine_id']
+            query2 = """
+            SELECT id, name FROM vaccine_vaccine WHERE total_availability-on_hold>0 AND id=%s 
+            """
+            #IN (SELECT vaccine_id FROM vaccine_appointment WHERE patient_id=%s ORDER BY vaccine_dose DESC LIMIT 1)
+            with connection.cursor() as cursor:
+                cursor.execute(query2, [vc_id])
+                columns = [col[0] for col in cursor.description]
+                vaccine_data = cursor.fetchall()
+            if not vaccine_data:
+                return JsonResponse({'message': 'Vaccine Dose not Available.'}, status=404)
+            #vaccine_data = tuple(zip(columns, *vaccine_data))
+            timezone.activate('UTC')
+            appt_day = timezone.now().date() + timedelta(1)
+            timezone.deactivate()
+            query3 = """
+            SELECT timestamp FROM vaccine_timeslot WHERE open_slots>0 AND DATE(timestamp)=%s
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(query2, [appt_day])
+                columns = [col[0] for col in cursor.description]
+                schedule_data = cursor.fetchall()
+            if not schedule_data:
+                return JsonResponse({'message': 'No Appointments Available.'})
+            schedule_data = tuple(zip(columns, *schedule_data))
+            response_data = {"schedule_data": schedule_options, "vaccine_data": vaccine_data}
+            return JsonResponse(response_data, safe=False)
+    else:
+        return JsonResponse({'message': 'This endpoint only accepts PUT or POST requests'})
+
+
+@csrf_exempt
+def patient_cancel_appt(request, user_id, user_type): 
+    if user_type not in ["Patient", "patient"]:
+        return JsonResponse({'message': 'User doesn\'t have access.'}, status=401)
+    if request.method=="GET":
+        print("POST req")
+        #appt_id = request.POST.get('appt_id')
+        patient_id = Patient.objects.get(user=user_id)
+        patient_id = patient_id.id
+        patient_name = Patient.objects.filter(user=user_id).values('user_id__name').first()
+        
+        print(patient_id, patient_name)
+        time = timezone.now()
+        print("Check")
+        apt = Appointment.objects.filter(timeslot__timestamp__gt=time, patient = patient_id).values('id', 'vaccine_dose', 'vaccine_id', 'vaccine_id__name', 'patient_id', 'timeslot_id', 'timeslot_id__timestamp')
+        # print(apt)
+        # timestamp = str(apt['timeslot_id__timestamp'])
+        # timestamp = timestamp.replace('T', " ")
+        if apt:
+            apt = dict(apt.first())
+            response_data = {'appt_id': apt['id'], 'vaccine_id': apt['vaccine_id'], 'vaccine_name': apt['vaccine_id__name'], 'patient_id': patient_id, 'patient_name': patient_name, 'timeslot_id': apt['timeslot_id'], 'timestamp': apt['timeslot_id__timestamp']}
+            if response_data:
+                return JsonResponse(response_data, safe=False)
+        return JsonResponse({'message': 'Unable to fetch appointment.'}, status=401)
+    elif request.method=="POST":
+        appt_id = request.POST.get('appt_id')
+        apt = Appointment.objects.filter(id = appt_id).values('id', 'vaccine_id', 'timeslot_id', 'timeslot_id__timestamp')
+        if timezone.now()>apt.first()['timeslot_id__timestamp']:
+            return JsonResponse({'message': 'The appointment is past deletion.'}, status=401)
+        query = """
+        DELETE FROM vaccine_appointment WHERE id = %s
+        """
+        count = -1
+        apt = apt.first()
+        with connection.cursor() as cursor:
+            cursor.execute(query, appt_id)
+            cursor.execute("""UPDATE vaccine_vaccine SET on_hold = GREATEST(0, on_hold-1) WHERE id=%s""", [apt['vaccine_id']])
+            cursor.execute("UPDATE vaccine_timeslot SET open_slots = LEAST(100, open_slots+1) WHERE id=%s", [apt['timeslot_id']])
+            count = cursor.rowcount
+            connection.commit()
+        if count>0:
+            return JsonResponse({'message': "Appointment deleted.", 'user_type': user_type}, status=201)
     else:
         return JsonResponse({'message': 'This endpoint only accepts PUT or POST requests'})

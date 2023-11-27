@@ -19,6 +19,7 @@ from django.urls import path
 from vaccine.views import login_view
 from vaccine.views import nurse_list, patient_list, register_nurse, admin_update_nurse_details, delete_nurse, add_vaccine, update_vaccine
 from vaccine.views import update_nurse_info,register_patient, record_appt, get_nurse_info,patient_update_info
+from vaccine.views import patient_schedule_appt,patient_cancel_appt
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -35,5 +36,7 @@ urlpatterns = [
     path('api/record-appt/nurse/', record_appt, name='record-appt'),
     path('api/nurse-info/<int:user_id>/',get_nurse_info , name='nurse-myinfo'),
     path('api/patient-update-info/<int:user_id>/<str:user_type>/', patient_update_info, name='patient-updateInfo'),
-
+    path('api/patient-schedule-appt/<int:user_id>/<str:user_type>/', patient_schedule_appt, name='patient-schedule-apt'),
+    
+    path('api/cancel-appointment/<int:user_id>/<str:user_type>/',patient_cancel_appt , name='patient-cancel-appointment'),
 ]
