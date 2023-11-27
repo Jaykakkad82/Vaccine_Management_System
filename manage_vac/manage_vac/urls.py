@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from vaccine.views import login_view
 from vaccine.views import nurse_list, patient_list, register_nurse, admin_update_nurse_details, delete_nurse, add_vaccine, update_vaccine
-
+from vaccine.views import update_nurse_info,register_patient, record_appt, get_nurse_info,patient_update_info
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -30,4 +30,10 @@ urlpatterns = [
     path('api/admin_delete_nurse/', delete_nurse, name='delete-nurse'),
     path('api/admin_add-vaccine/', add_vaccine, name='add-vaccine'),
     path('api/admin_update-vaccine/', update_vaccine, name='update-vaccine'),
+    path('api/get-nurse-info/<int:user_id>/<str:user_type>/', update_nurse_info, name='nurse-updateInfo'),
+    path('api/register-patient/', register_patient, name='register-patient'),
+    path('api/record-appt/nurse/', record_appt, name='record-appt'),
+    path('api/nurse-info/<int:user_id>/',get_nurse_info , name='nurse-myinfo'),
+    path('api/patient-update-info/<int:user_id>/<str:user_type>/', patient_update_info, name='patient-updateInfo'),
+
 ]

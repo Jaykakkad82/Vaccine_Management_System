@@ -12,7 +12,7 @@ from django.contrib.auth import authenticate, login
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
-from .models import User, Nurse  # Import your User model
+from .models import User, Nurse, Patient, Vaccine, Timeslot, Appointment, Record, Assigned  # Import your User model
 
 
 @csrf_exempt
@@ -51,7 +51,53 @@ def login_view(request):
         return JsonResponse({'message': 'This endpoint only accepts POST requests'})
 
 
-# ======= COMMENTED OUT =====================#
+
+@csrf_exempt
+def register_patient(request):
+    if request.method == 'POST':
+        # Get form data
+        name = request.POST.get('name')
+        age = request.POST.get('age')
+        phone_number = request.POST.get('phoneNumber')
+        gender = request.POST.get('gender')
+        address = request.POST.get('address')
+        ssn = request.POST.get('ssn')
+        user_name = request.POST.get('username')
+        password = request.POST.get('password')
+        race = request.POST.get('race')
+        job = request.POST.get('occupation')
+        med_det = request.POST.get('medicalHistory')
+        #print([name, employee_id, age])
+
+        # Check if user with the given employee_id already exists
+        if Patient.objects.filter(user__user_name=user_name).exists():
+            return JsonResponse({'message': 'Cannot Register. User with this username already exists'}, status=400)
+
+        query = """
+        INSERT INTO vaccine_user (name, password,phone_number, ssn, address, age, gender, user_type, user_name)
+        VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, [name, password, phone_number, ssn, address, age, gender, 'Patient', user_name])
+            user = cursor.lastrowid
+        # Create a new nurse in the vaccine_nurse table
+      
+        query = """
+        INSERT INTO vaccine_patient (no_doses_received, race, occupation, medical_history, user_id)
+        VALUES(%s, %s, %s, %s, %s)
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, [ 0, race, job, med_det, user])
+            check = cursor.rowcount
+        if check>0:
+            return JsonResponse({'message': 'Patient registered successfully'}, status=201)
+        else:
+            return JsonResponse({'message': 'Error in Registration.'}, status=401)
+    else:
+        return JsonResponse({'message': 'HTTP Request other than POST encountered.'}, status=405)
+
+
+# ======= COMMENTED OUT - Admin Dashboard - received code =====================#
 
 # #Assuming username and password are not being updated. So, name, ssn, age, gender would be the updated details. 
 # #Information needed: nurse_id, user_id, 
@@ -153,39 +199,11 @@ def update_vaccine(request):
 
 # ======================================== TILL THIS POINT =================================================================
 
-# views.py
-
-# from rest_framework.generics import ListAPIView
-# from rest_framework.response import Response
-# from rest_framework import status
-# from .models import Nurse
-# from .serializers import NurseSerializer
-
-# @csrf_exempt
-# class NurseListView(ListAPIView):
-#     queryset = Nurse.objects.all()
-#     serializer_class = NurseSerializer
-#     # def get(self, request, *args, **kwargs):
-#     #     nurses = Nurse.objects.all()
-#     #     serializer = NurseSerializer(nurses, many=True)
-#     #     return Response(serializer.data, status=status.HTTP_200_OK)
 
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from .models import Nurse
 from .serializers import NurseSerializer
-
-# @csrf_exempt
-# def nurse_list(request):
-#     #print("Got request")
-#     if request.method == 'GET':
-#         nurses = Nurse.objects.all()
-#         serializer = NurseSerializer(nurses, many=True)
-#         #print('Data before sending:', serializer.data)
-
-#         return JsonResponse(serializer.data, safe=False)
-#     else:
-#         return JsonResponse({'message': 'Method not allowed'}, status=405)
 
 from .serializers import CustomNurseSerializer, CustomPatientSerializer
 @csrf_exempt
@@ -331,98 +349,171 @@ def admin_update_nurse_details(request, nurse_id):
     else:
         return JsonResponse({'message': 'Method not allowed'}, status=405)
 
+#Address and Phone Number update from Nurse. 
+#Information needed: user_id, user_type, phone_number, address
+#If either phone number or address is unchanged, send the original value.
 
-
-# @api_view(['POST'])
-# def register_nurse_view(request):
-#     if request.method == 'POST':
-#         serializer = NurseSerializer(data=request.data)
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+#ACCESSED BY NURSE
+@csrf_exempt
+def update_nurse_info(request,user_id,user_type):
     
+    if request.method=='GET':
+        query = """
+        SELECT phone_number, address FROM vaccine_user WHERE vaccine_user.id=%s
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, [user_id])
+            columns = [col[0] for col in cursor.description]
+            nurse_data = cursor.fetchone()
+        if not nurse_data:
+            return JsonResponse({'message': 'Nurse ID does not exist'}, status=404)
+        response_data = dict(zip(columns, nurse_data))
+        return JsonResponse(response_data, safe=False)
+        
+    elif request.method=='POST':
+        user_row = -1
 
-# @api_view(['PUT'])
-# def update_nurse_info_view(request, nurse_id):
-#     try:
-#         nurse = Nurse.objects.get(id=nurse_id)
-#     except Nurse.DoesNotExist:
-#         return Response(status=status.HTTP_404_NOT_FOUND)
+        if user_type=="Nurse" or user_type=="nurse":
+            query2 = """
+            UPDATE vaccine_user SET phone_number=%s, address=%s WHERE id= %s
+            """
+            #updated_details = json.loads(request.body.decode('utf-8'))['updatedDetails']
+            
+            phone_number = request.POST.get("phone_number")
+            address = request.POST.get("address")
 
-#     if request.method == 'PUT':
-#         serializer = NurseSerializer(nurse, data=request.data)
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            cursor = connection.cursor()
+            cursor.execute(query2, [phone_number, address, user_id])
+            user_row = cursor.rowcount
+            if user_row>0:
+                return JsonResponse({'message': 'Nurse Details updated successfully.', 'user_type': user_type})
+            elif user_row==0:
+                return JsonResponse({'message': 'No record found.'}, status=401)
+        else:
+            return JsonResponse({'message': 'User doesn\'t have access.'}, status=401)
+        
+        
+    else:
+        return JsonResponse({'message': 'This endpoint only accepts PUT or POST requests'})
 
-# @api_view(['DELETE'])
-# def delete_nurse_view(request, nurse_id):
-#     try:
-#         nurse = Nurse.objects.get(id=nurse_id)
-#     except Nurse.DoesNotExist:
-#         return Response(status=status.HTTP_404_NOT_FOUND)
+#Information Needed: appt_id, user_id, user_type
+#We can do it this way: Once patient has scheduled an appt, they get the appt id. They can share it with the nurse. 
+#So, similar to adding nurse id in admin module, the nurse will simply enter the appt id to create a record.
+#Hence, only a put request considered.
 
-#     if request.method == 'DELETE':
-#         nurse.delete()
-#         return Response(status=status.HTTP_204_NO_CONTENT)
-    
+### ????? WE NEED TO CHECK IF RECORD ALREADY EXISTS FOR THE GIVEN APPOINTMENT ID??????
+### ??? 
+@csrf_exempt
+def record_appt(request):
+    user_type = request.POST.get('user_type')
+    print(user_type)
+    if user_type not in ["Nurse", "nurse"]:
+        return JsonResponse({'message': 'User doesn\'t have access.'}, status=401)
+    if request.method=="POST":
+        user_id = request.POST.get('user_id')
+        print(user_id)
+        nurse_id = Nurse.objects.get(user__id = user_id)
+        nurse_id = nurse_id.id
+        appt_id = request.POST.get('appt_id')
+        with connection.cursor() as cursor:
+            # always provide fields when updating because id is auto-increment
+            query1 = """INSERT INTO vaccine_record(apt_id_id,nurse_id) 
+            VALUES(%s, %s)"""
+            cursor.execute(query1, [appt_id, nurse_id])
+            query2 ="""UPDATE vaccine_vaccine SET total_availability=total_availability-1, on_hold=on_hold-1 
+                    WHERE id IN (SELECT vaccine_id FROM vaccine_appointment WHERE id=%s)"""
+            cursor.execute(query2, [appt_id])
+            query3 = """UPDATE vaccine_patient SET no_doses_received=(SELECT vaccine_dose FROM vaccine_appointment WHERE id=%s) 
+                        WHERE id=(SELECT patient_id FROM vaccine_appointment where id=%s)"""
+            cursor.execute(query3, [appt_id, appt_id])
+            return JsonResponse({'message': "Record added successfully.", 'user_type': user_type})
+    else:
+        return JsonResponse({'message': 'This endpoint only accepts POST requests'})
 
-# # views.py in your app
+@csrf_exempt
+def get_nurse_info(request, user_id):
+    try:
+        nurse_info = {}
+        # Your SQL query to fetch nurse information
+        query_nurse = '''SELECT vaccine_nurse.id as id, vaccine_nurse.emp_id as emp_id, vaccine_user.name as name, 
+        vaccine_user.phone_number as phone_number, vaccine_user.address as address, vaccine_user.gender as gender,
+        vaccine_user.user_name as username  
+        FROM vaccine_nurse JOIN vaccine_user ON vaccine_nurse.user_id = vaccine_user.id 
+        WHERE vaccine_nurse.user_id = %s'''
 
+        with connection.cursor() as cursor:
+            # Execute query to get nurse information
+            cursor.execute(query_nurse, [user_id])
+            result_nurse = cursor.fetchone()
 
+            if result_nurse:
+                # Include basic nurse information in nurse_info
+                nurse_info = {
+                    'id': result_nurse[0],
+                    'emp_id': result_nurse[1],
+                    'name': result_nurse[2],
+                    'phone_number': result_nurse[3],
+                    'address': result_nurse[4],
+                    'gender': result_nurse[5],
+                    'username': result_nurse[6]
+                }
 
-# @api_view(['POST'])
-# def add_vaccine_view(request):
-#     if request.method == 'POST':
-#         serializer = VaccineSerializer(data=request.data)
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-# # views.py in your app
+                # Execute query to get schedule times
+                query_schedule = '''SELECT vaccine_timeslot.timestamp 
+                            FROM vaccine_assigned JOIN vaccine_timeslot  ON vaccine_assigned.timeslot_id = vaccine_timeslot.id
+                            WHERE nurse_id = %s'''
+                cursor.execute(query_schedule, [result_nurse[0]])
+                result_schedule = cursor.fetchall()
 
-# @api_view(['PUT'])
-# def update_vaccine_view(request, vaccine_id):
-#     try:
-#         vaccine = Vaccine.objects.get(id=vaccine_id)
-#     except Vaccine.DoesNotExist:
-#         return Response(status=status.HTTP_404_NOT_FOUND)
+                # Include schedule times in nurse_info
+                nurse_info['schedule_times'] = [time[0] for time in result_schedule]
 
-#     if request.method == 'PUT':
-#         serializer = VaccineSerializer(vaccine, data=request.data)
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-# # views.py in your app
+        return JsonResponse(nurse_info, safe=False)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
-# @api_view(['GET'])
-# def view_nurse_info_view(request, nurse_id):
-#     try:
-#         nurse = Nurse.objects.get(id=nurse_id)
-#     except Nurse.DoesNotExist:
-#         return Response(status=status.HTTP_404_NOT_FOUND)
-
-#     if request.method == 'GET':
-#         serializer = NurseSerializer(nurse)
-#         return Response(serializer.data)
-# # views.py in your app
-
-# from .models import Patient
-# from .serializers import PatientSerializer
-
-# @api_view(['GET'])
-# def view_patient_info_view(request, patient_id):
-#     try:
-#         patient = Patient.objects.get(id=patient_id)
-#     except Patient.DoesNotExist:
-#         return Response(status=status.HTTP_404_NOT_FOUND)
-
-#     if request.method == 'GET':
-#         serializer = PatientSerializer(patient)
-#         return Response(serializer.data)
-
-    
-
+#Information Needed: all user, patient fields
+#Information that can't be modified/registered: user_type, no_doses_received
+@csrf_exempt
+def patient_update_info(request, user_id, user_type):
+    if user_type not in ["Patient","patient"]:
+        return JsonResponse({'message': 'User doesn\'t have access.'}, status=401)
+    if request.method=="GET":
+        query = """
+        SELECT A.name as name, A.password as password, A.phone_number as phone_number, A.ssn as ssn, 
+        A.address as address, A.age as age, A.gender as gender, A.user_name as user_name, B.race as race, 
+        B.occupation as occupation, B.medical_history as medical_history 
+        FROM vaccine_user A JOIN vaccine_patient B ON A.id = B.user_id WHERE A.id=%s
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, [user_id])
+            columns = [col[0] for col in cursor.description]
+            patient_data = cursor.fetchone()
+        if not patient_data:
+            return JsonResponse({'message': 'Patient does not exist.'}, status=404)
+        response_data = dict(zip(columns, patient_data))
+        return JsonResponse(response_data, safe=False)
+    elif request.method=="POST":
+        user_row = -1
+        
+        name = request.POST.get('name')
+        pswd = request.POST.get('password')
+        phnum = request.POST.get('phone_number')
+        ssn = request.POST.get('ssn')
+        addr = request.POST.get('address')
+        age = request.POST.get('age')
+        gen = request.POST.get('gender')
+        uname = request.POST.get('user_name')
+        race = request.POST.get('race')
+        job = request.POST.get('occupation')
+        med_det = request.POST.get('medical_history')
+        query = """
+        UPDATE vaccine_user SET name=%s, password=%s, phone_number=%s, ssn=%s, address=%s, age=%s, gender=%s, 
+        user_name=%s WHERE id=%s
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, [name, pswd, phnum, ssn, addr, age, gen, uname, user_id])
+            cursor.execute("""UPDATE vaccine_patient SET race=%s, occupation=%s, medical_history=%s WHERE user_id=%s""", [race, job, med_det, user_id])
+            return JsonResponse({'message': 'Patient Details updated successfully.', 'user_type': user_type})
+    else:
+        return JsonResponse({'message': 'This endpoint only accepts PUT or POST requests'})
